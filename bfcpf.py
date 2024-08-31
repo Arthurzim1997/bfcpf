@@ -1,6 +1,7 @@
-import json
+import argparse
 import itertools
-import requests
+import textwrap
+
 
 DIGITS = "0123456789"
 
@@ -8,7 +9,28 @@ CPF_LENGTH_WITHOUT_PONCTUATION = 11
 CPF_LENGTH_WITH_PONCTUATION = 14
 
 
+def print_line():
+    print("-" * 40)
+
+
 class BFCPF:
+    def __init__(self, args) -> None:
+        self.args = args
+        self.output = ""
+
+    def save_output_to_file(self) -> None:
+        output_file_path = f"{self.args.cpf}.txt"
+
+        with open(output_file_path, "w") as output_file:
+            output_file.write(self.output)
+
+    def print_output(self) -> None:
+        print(self.output)
+
+    def main_menu(self):
+        with open("./interface/main_menu.txt", "r") as main_menu_file:
+            print(main_menu_file.read())
+
     def is_character_valid(self, character: str) -> str:
         if character in DIGITS:
             return character
@@ -68,26 +90,8 @@ class BFCPF:
                 missing_digits_indexes.append(i)
 
         return missing_digits_indexes
-    
-    def request_gov_api(self, valid_cpf: str) -> requests.Response:
-        termo = valid_cpf
-        pagina = 1
-        tamanho_pagina = 10
-        t = "5asIvv4b4YB453bWielC"
-        token_captcha = "03AFcWeA66ZQaEZIugWYAuzKTlTVSKn6dYG9_l-N04V-iYm7jarvFFAb1ylZOUL-10fA-PSaB78fxtzearj-WjdgyseTgiJaNtPDbds4wGtFRnhPYCLHMPqigmGuIgNfceU4zsjy0fUO-w9S82nLTPeq217nVNfPicxSuKXe8SyX2hD1V3xd_AwJWAtjzZyBvS8ixlp_vzNYYFY3US-XV75UA9SoKRZ1fw_Dn09lIRPi6bs0lsC4OG9s2FThBQPBVRiKtH87SXR5Mx2xNBlfCPSpVdvS9W2r79xjXFfgPufufXwSaOo9zw1uePut9E1flMlHQ7xFKrvz1sdyjkWp3II7zSYQQY9GDcIp1H4OK86ptOF4TfF6X0wvEdvrjdShSGFUt3k0AbRvPq_ULhZIQgK1I7cRcggtZsFt5R3bkWwit4IptAKYNXyiU-m2V8JzB-GLVF1AUToJJ_bQkNE86bJEgk4yst4r0G4DN-zPfzsX5wdXaBI9MNBW-nEY5H4ZbmMlqDj1moLw9dOOLv8KBRx0jLMfA66oSShmxFVZR9oM2Pi19gX3JxXJ44AEMMRj1gS8MERqQqShdVW4iOwGCkspvq_Z1gFWvVJaEWjtOoYfGfKJCJo2jewbBPKTSWl-3rznY05f3cukPBIYRzjJMXLRMWY7j0wU-KudU4Wbv_OJNhzBIXvcfgpenyUs-Te6n7ZkPkxKXHb1WoqLmHVSxFSGI8K62hA9HxfGCWweL2pAMwSjCA9yYU7oIN8BZvQGh3SWnMx1O1lPekOuVCCHkaSudQPrkD2I7dcOFNBF-HjiuX_a3HUzLl0hUTUGs4QguUafqH6IQfngHOBNqzdTwJ0z_X9F1awLA64Ns9X10_-0Nbml3GuDgcxAmIwAQR4uug9gTi6n6yFHZ5tsBzM33ESgbnnv8MX9M3KA"
-        
-        url = f"https://portaldatransparencia.gov.br/pessoa-fisica/busca/resultado?termo={termo}&pagina={pagina}&tamanhoPagina={tamanho_pagina}&t={t}&tokenRecaptcha={token_captcha}"
-        
-        response = requests.get(url)
-        
-        return response
-    
-    def cpf_exists_on_gov_api(self, valid_cpf: str) -> bool:
-        response = self.request_gov_api(valid_cpf)
-        
-        print(response)
 
-    def brute_force(self, sanitized_cpf: str) -> str:
+    def discover_valid_cpfs(self, sanitized_cpf: str) -> str:
         valid_cpfs = []
 
         missing_digits_indexes = self.find_missing_digits_indexes(sanitized_cpf)
@@ -106,13 +110,57 @@ class BFCPF:
             if self.is_cpf_valid(cpf):
                 valid_cpfs.append(cpf)
 
-        # Implement request on GOV API
-        
-        for valid_cpf in valid_cpfs:
-            cpf_exists_on_gov_api = self.cpf_exists_on_gov_api(valid_cpf)
-            exit(1)
+        return valid_cpfs
 
-    def run(self, partial_cpf: str):
-        sanitized_cpf = self.sanitize_cpf(partial_cpf)
+    def brute_force(self, sanitized_cpf: str) -> str:
+        valid_cpfs = self.discover_valid_cpfs(sanitized_cpf)
 
+        self.output += "Valid CPFs found:\n\n"
+        self.output += "\n".join(valid_cpfs)
+
+    def run(self):
+        self.main_menu()
+        print_line()
+
+        sanitized_cpf = self.sanitize_cpf(self.args.cpf)
         self.brute_force(sanitized_cpf)
+
+        if self.args.file == "yes":
+            self.save_output_to_file()
+
+        else:
+            self.print_output()
+
+
+def main():
+    epilog = ""
+
+    with open("./interface/epilog.txt", "r") as epilog_file:
+        epilog = epilog_file.read()
+
+    parser = argparse.ArgumentParser(
+        description="CPF Brute Forcer by Gustavo Naldoni",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent(epilog),
+    )
+
+    parser.add_argument("-c", "--cpf", required=True, help="partial CPF to attack")
+    parser.add_argument(
+        "-o",
+        "--osint",
+        required=False,
+        default="yes",
+        help="use OSINT to check CPFs discovered (yes/no)",
+    )
+    parser.add_argument(
+        "-f", "--file", required=False, default="no", help="output as a file (yes/no)"
+    )
+
+    args = parser.parse_args()
+
+    bfcpf = BFCPF(args)
+    bfcpf.run()
+
+
+if __name__ == "__main__":
+    main()
