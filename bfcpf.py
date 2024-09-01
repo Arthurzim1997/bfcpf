@@ -198,19 +198,12 @@ def main():
         epilog = epilog_file.read()
 
     parser = argparse.ArgumentParser(
-        description="CPF Brute Forcer by Gustavo Naldoni",
+        description="CPF Brute Forcer by Gustavo Naldoni & André Zappa",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent(epilog),
     )
 
     parser.add_argument("-c", "--cpf", required=True, help="partial CPF to attack")
-    parser.add_argument(
-        "-o",
-        "--osint",
-        required=False,
-        default="yes",
-        help="use OSINT to check CPFs discovered (yes/no)",
-    )
     parser.add_argument(
         "-f", "--file", required=False, default="no", help="output as a file (yes/no)"
     )
