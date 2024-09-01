@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import textwrap
+import threading
 
 
 DIGITS = "0123456789"
@@ -17,6 +18,54 @@ class BFCPF:
     def __init__(self, args) -> None:
         self.args = args
         self.output = ""
+
+        self.possibilities = self.discover_possibilities()
+        self.threads = self.create_threads()
+
+        self.valid_cpfs = []
+
+    def create_threads(self) -> list[threading.Thread]:
+        threads = []
+
+        missing_digits_indexes = self.find_missing_digits_indexes(self.args.cpf)
+
+        total_missing_digits = len(missing_digits_indexes)
+        total_possibilities = len(DIGITS) ** total_missing_digits
+
+        possibilities_per_thread = total_possibilities // self.args.threads
+
+        if total_possibilities % self.args.threads != 0:
+            self.args.threads += 1
+
+        start_index = 0
+        end_index = possibilities_per_thread - 1
+
+        thread = threading.Thread(
+            target=self.discover_valid_cpfs_of_thread, args=(start_index, end_index)
+        )
+        threads.append(thread)
+
+        for _ in range(self.args.threads - 1):
+            start_index += possibilities_per_thread
+            end_index += possibilities_per_thread
+
+            if end_index >= total_possibilities:
+                end_index = total_possibilities - 1
+
+            thread = threading.Thread(
+                target=self.discover_valid_cpfs_of_thread, args=(start_index, end_index)
+            )
+            threads.append(thread)
+
+        return threads
+
+    def start_threads(self) -> None:
+        for thread in self.threads:
+            thread.start()
+
+    def join_threads(self) -> None:
+        for thread in self.threads:
+            thread.join()
 
     def save_output_to_file(self) -> None:
         output_file_path = f"{self.args.cpf}.txt"
@@ -91,15 +140,25 @@ class BFCPF:
 
         return missing_digits_indexes
 
-    def discover_valid_cpfs(self, sanitized_cpf: str) -> str:
-        valid_cpfs = []
+    def discover_possibilities(self) -> itertools.product:
+        sanitized_cpf = self.sanitize_cpf(self.args.cpf)
 
         missing_digits_indexes = self.find_missing_digits_indexes(sanitized_cpf)
         total_missing_digits = len(missing_digits_indexes)
 
         possibilities = itertools.product(DIGITS, repeat=total_missing_digits)
+        possibilities = list(possibilities)
 
-        for possibility in possibilities:
+        return possibilities
+
+    def discover_valid_cpfs_of_thread(self, start_index: int, end_index: int):
+        sanitized_cpf = self.sanitize_cpf(self.args.cpf)
+
+        missing_digits_indexes = self.find_missing_digits_indexes(sanitized_cpf)
+
+        for i in range(start_index, end_index + 1):
+            possibility = self.possibilities[i]
+
             sanitized_cpf_list = list(sanitized_cpf)
 
             for i, missing_digit_index in enumerate(missing_digits_indexes):
@@ -108,22 +167,22 @@ class BFCPF:
             cpf = "".join(sanitized_cpf_list)
 
             if self.is_cpf_valid(cpf):
-                valid_cpfs.append(cpf)
+                cpf = self.desanitize_cpf(cpf)
 
-        return valid_cpfs
+                self.valid_cpfs.append(cpf)
 
-    def brute_force(self, sanitized_cpf: str) -> str:
-        valid_cpfs = self.discover_valid_cpfs(sanitized_cpf)
+    def brute_force(self) -> str:
+        self.start_threads()
+        self.join_threads()
 
         self.output += "Valid CPFs found:\n\n"
-        self.output += "\n".join(valid_cpfs)
+        self.output += "\n".join(self.valid_cpfs)
 
     def run(self):
         self.main_menu()
         print_line()
 
-        sanitized_cpf = self.sanitize_cpf(self.args.cpf)
-        self.brute_force(sanitized_cpf)
+        self.brute_force()
 
         if self.args.file == "yes":
             self.save_output_to_file()
@@ -154,6 +213,14 @@ def main():
     )
     parser.add_argument(
         "-f", "--file", required=False, default="no", help="output as a file (yes/no)"
+    )
+    parser.add_argument(
+        "-t",
+        "--threads",
+        required=False,
+        default=10,
+        type=int,
+        help="number of threads",
     )
 
     args = parser.parse_args()
