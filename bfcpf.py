@@ -189,6 +189,7 @@ class BFCPF:
             self.output += "\n\nOSINT info about the CPFs:\n\n"
 
             for valid_cpf in self.valid_cpfs:
+                print(f"OSINT search: {valid_cpf}")
                 osint_search_results = self.osint.check_cpf(valid_cpf)
 
                 if len(osint_search_results) > 0:
