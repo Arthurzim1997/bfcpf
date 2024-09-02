@@ -4,6 +4,9 @@ import textwrap
 import threading
 
 
+from osint import OSINT
+
+
 DIGITS = "0123456789"
 
 CPF_LENGTH_WITHOUT_PONCTUATION = 11
@@ -23,6 +26,9 @@ class BFCPF:
         self.threads = self.create_threads()
 
         self.valid_cpfs = []
+
+        if self.args.osint == "yes":
+            self.osint = OSINT()
 
     def create_threads(self) -> list[threading.Thread]:
         threads = []
@@ -178,6 +184,23 @@ class BFCPF:
         self.output += "Valid CPFs found:\n\n"
         self.output += "\n".join(self.valid_cpfs)
 
+        if self.args.osint == "yes":
+            self.output += "\n" * 2 + "-" * 20
+            self.output += "\n\nOSINT info about the CPFs:\n\n"
+
+            for valid_cpf in self.valid_cpfs:
+                osint_search_results = self.osint.check_cpf(valid_cpf)
+
+                if len(osint_search_results) > 0:
+                    self.output += f"{valid_cpf}: "
+
+                    for osint_search_result in osint_search_results:
+                        self.output += f"{osint_search_result} "
+
+                    self.output += "\n"
+
+            self.osint.kill_webdriver()
+
     def run(self):
         self.main_menu()
         print_line()
@@ -214,6 +237,13 @@ def main():
         default=10,
         type=int,
         help="number of threads",
+    )
+    parser.add_argument(
+        "-o",
+        "--osint",
+        required=False,
+        default="yes",
+        help="use OSINT on each valid CPF found (yes/no)",
     )
 
     args = parser.parse_args()
