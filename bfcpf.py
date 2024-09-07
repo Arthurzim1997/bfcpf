@@ -4,6 +4,7 @@ import textwrap
 import threading
 
 
+from args_validator import ArgsValidator
 from osint import OSINT
 
 
@@ -22,56 +23,10 @@ class BFCPF:
         self.args = args
         self.output = ""
 
-        self.possibilities = self.discover_possibilities()
-        self.threads = self.create_threads()
-
-        self.valid_cpfs = []
+        self.sanitized_cpf = self.sanitize_cpf(self.args.cpf)
 
         if self.args.osint == "yes":
             self.osint = OSINT()
-
-    def create_threads(self) -> list[threading.Thread]:
-        threads = []
-
-        missing_digits_indexes = self.find_missing_digits_indexes(self.args.cpf)
-
-        total_missing_digits = len(missing_digits_indexes)
-        total_possibilities = len(DIGITS) ** total_missing_digits
-
-        possibilities_per_thread = total_possibilities // self.args.threads
-
-        if total_possibilities % self.args.threads != 0:
-            self.args.threads += 1
-
-        start_index = 0
-        end_index = possibilities_per_thread - 1
-
-        thread = threading.Thread(
-            target=self.discover_valid_cpfs_of_thread, args=(start_index, end_index)
-        )
-        threads.append(thread)
-
-        for _ in range(self.args.threads - 1):
-            start_index += possibilities_per_thread
-            end_index += possibilities_per_thread
-
-            if end_index >= total_possibilities:
-                end_index = total_possibilities - 1
-
-            thread = threading.Thread(
-                target=self.discover_valid_cpfs_of_thread, args=(start_index, end_index)
-            )
-            threads.append(thread)
-
-        return threads
-
-    def start_threads(self) -> None:
-        for thread in self.threads:
-            thread.start()
-
-    def join_threads(self) -> None:
-        for thread in self.threads:
-            thread.join()
 
     def save_output_to_file(self) -> None:
         output_file_path = f"{self.args.cpf}.txt"
@@ -147,25 +102,21 @@ class BFCPF:
         return missing_digits_indexes
 
     def discover_possibilities(self) -> itertools.product:
-        sanitized_cpf = self.sanitize_cpf(self.args.cpf)
-
-        missing_digits_indexes = self.find_missing_digits_indexes(sanitized_cpf)
+        missing_digits_indexes = self.find_missing_digits_indexes(self.sanitized_cpf)
         total_missing_digits = len(missing_digits_indexes)
 
         possibilities = itertools.product(DIGITS, repeat=total_missing_digits)
-        possibilities = list(possibilities)
 
         return possibilities
 
-    def discover_valid_cpfs_of_thread(self, start_index: int, end_index: int):
-        sanitized_cpf = self.sanitize_cpf(self.args.cpf)
+    def discover_valid_cpfs(self) -> list[str]:
+        valid_cpfs = []
 
-        missing_digits_indexes = self.find_missing_digits_indexes(sanitized_cpf)
+        missing_digits_indexes = self.find_missing_digits_indexes(self.sanitized_cpf)
+        possibilities = self.discover_possibilities()
 
-        for i in range(start_index, end_index + 1):
-            possibility = self.possibilities[i]
-
-            sanitized_cpf_list = list(sanitized_cpf)
+        for possibility in possibilities:
+            sanitized_cpf_list = list(self.sanitized_cpf)
 
             for i, missing_digit_index in enumerate(missing_digits_indexes):
                 sanitized_cpf_list[missing_digit_index] = possibility[i]
@@ -175,20 +126,21 @@ class BFCPF:
             if self.is_cpf_valid(cpf):
                 cpf = self.desanitize_cpf(cpf)
 
-                self.valid_cpfs.append(cpf)
+                valid_cpfs.append(cpf)
 
-    def brute_force(self) -> str:
-        self.start_threads()
-        self.join_threads()
+        return valid_cpfs
+
+    def brute_force(self) -> None:
+        valid_cpfs = self.discover_valid_cpfs()
 
         self.output += "Valid CPFs found:\n\n"
-        self.output += "\n".join(self.valid_cpfs)
+        self.output += "\n".join(valid_cpfs)
 
         if self.args.osint == "yes":
             self.output += "\n" * 2 + "-" * 20
             self.output += "\n\nOSINT info about the CPFs:\n\n"
 
-            for valid_cpf in self.valid_cpfs:
+            for valid_cpf in valid_cpfs:
                 print(f"OSINT search: {valid_cpf}")
                 osint_search_results = self.osint.check_cpf(valid_cpf)
 
@@ -227,9 +179,22 @@ def main():
         epilog=textwrap.dedent(epilog),
     )
 
-    parser.add_argument("-c", "--cpf", required=True, help="partial CPF to attack")
+    args_validator = ArgsValidator()
+
     parser.add_argument(
-        "-f", "--file", required=False, default="no", help="output as a file (yes/no)"
+        "-c",
+        "--cpf",
+        required=True,
+        type=args_validator.validate_cpf,
+        help="partial CPF to attack",
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        required=False,
+        default="no",
+        type=args_validator.validate_file,
+        help="output as a file (yes/no)",
     )
     parser.add_argument(
         "-t",
@@ -244,6 +209,7 @@ def main():
         "--osint",
         required=False,
         default="yes",
+        type=args_validator.validate_osint,
         help="use OSINT on each valid CPF found (yes/no)",
     )
 
