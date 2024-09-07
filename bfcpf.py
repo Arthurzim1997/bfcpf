@@ -197,14 +197,6 @@ def main():
         help="output as a file (yes/no)",
     )
     parser.add_argument(
-        "-t",
-        "--threads",
-        required=False,
-        default=10,
-        type=int,
-        help="number of threads",
-    )
-    parser.add_argument(
         "-o",
         "--osint",
         required=False,

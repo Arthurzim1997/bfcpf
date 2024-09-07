@@ -48,13 +48,12 @@ The example above produced a file named `X21.345.567-XX.txt`, shown below:
 
     $ python bfcpf.py -c 1XX.X3X.568-XX
     $ python bfcpf.py -c XXX.345.567-XX -f yes
-    $ python bfcpf.py -c XXX.345.567-XX -f yes -t 25
+    $ python bfcpf.py -c XXX.345.567-XX -f yes -o yes
 
 The meaning of each flag is described below:
 
     -c or --cpf: the partial cpf with ponctuation to break (*)
     -f or --file: output as a file (yes/no - default=no)
-    -t or --threads: number of threads to use while breaking the CPF (default=10)
     -o or --osint: use OSINT (yes/no - default=yes)
 
 Note that the flags marked with (*) are REQUIRED by the program to execute!
@@ -63,5 +62,5 @@ Note that the flags marked with (*) are REQUIRED by the program to execute!
 
 There are several things to note about this script:
 
-- Because of *combinatorics* the number of possibilities of every `X` on the CPF increases by a factor of 10. Thus, for `n` entries `X`, there are `10^n` possible CPF's. This is important because you can easily empty your RAM with `n > 5`.
+- Because of *combinatorics* the number of possibilities of every `X` on the CPF increases by a factor of 10. Thus, for `n` entries `X`, there are `10^n` possible CPF's. This is important because depending on your processing power, for `n > 6` the script may "last forever".
 - The OSINT information gathered by this program is completely FREE and uses only public data, available to anyone with Internet access.
